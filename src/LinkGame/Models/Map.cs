@@ -28,8 +28,6 @@ namespace LinkGame.Models
 
         #endregion Private Fields
 
-        public event EventHandler<TileChangedEventArgs> TileChanged;
-
         #region Public Constructors
 
         public Map(int width, int height, int totalTileTypes)
@@ -42,9 +40,29 @@ namespace LinkGame.Models
 
         #endregion Public Constructors
 
+        #region Public Events
+
+        public event EventHandler<TileChangedEventArgs> TileChanged;
+
+        #endregion Public Events
+
         #region Public Properties
 
         public int Height { get; }
+        public bool Resolved
+        {
+            get
+            {
+                for (var x = 0; x < Width; x++)
+                    for (var y = 0; y < Height; y++)
+                    {
+                        if (_mapData[x, y] != FreeTileValue)
+                            return false;
+                    }
+                return true;
+            }
+        }
+
         public IEnumerable<KeyValuePair<int, List<Point>>> TileCoordinates => _tileCoordinates;
         public int TotalTileTypes { get; }
         public int Width { get; }
@@ -70,43 +88,6 @@ namespace LinkGame.Models
             }
 
             return result;
-        }
-
-        public void SetTileValue(int x, int y, int val = FreeTileValue)
-        {
-            if ((val < 1 || val > TotalTileTypes) && val != FreeTileValue)
-                return;
-
-            var origValue = _mapData[x, y];
-            if (origValue != val)
-            {
-                _mapData[x, y] = val;
-                TileChanged?.Invoke(this, new TileChangedEventArgs(x, y, origValue, val));
-
-                if (origValue != FreeTileValue)
-                {
-                    _tileCoordinates[origValue].Remove(new Point(x, y));
-                }
-
-                if (val != FreeTileValue)
-                {
-                    _tileCoordinates[val].Add(new Point(x, y));
-                }
-            }
-        }
-
-        public bool Resolved
-        {
-            get
-            {
-                for (var x = 0; x < Width; x++)
-                    for (var y = 0; y < Height; y++)
-                    {
-                        if (_mapData[x, y] != FreeTileValue)
-                            return false;
-                    }
-                return true;
-            }
         }
 
         public int GetTileValue(int x, int y)
@@ -180,6 +161,28 @@ namespace LinkGame.Models
             }
         }
 
+        public void SetTileValue(int x, int y, int val = FreeTileValue)
+        {
+            if ((val < 1 || val > TotalTileTypes) && val != FreeTileValue)
+                return;
+
+            var origValue = _mapData[x, y];
+            if (origValue != val)
+            {
+                _mapData[x, y] = val;
+                TileChanged?.Invoke(this, new TileChangedEventArgs(x, y, origValue, val));
+
+                if (origValue != FreeTileValue)
+                {
+                    _tileCoordinates[origValue].Remove(new Point(x, y));
+                }
+
+                if (val != FreeTileValue)
+                {
+                    _tileCoordinates[val].Add(new Point(x, y));
+                }
+            }
+        }
         public bool TryResolve(Point start, Point end, out ResolutionPath resolution) =>
             TryGetDirectPath(start, end, out resolution) ||
             TryGetPathWithOneCorner(start, end, out resolution) ||

@@ -17,13 +17,33 @@ namespace LinkGame
 {
     public partial class FrmMain : Form
     {
+
         #region Private Fields
 
         private const string IconSet = @"Icons\circus.zip";
+        private const int TileSize = 64;
+        private readonly BackgroundMusic _bgm = new(new[]
+        {
+            "Music\\1.mp3",
+            "Music\\2.mp3",
+            "Music\\3.mp3",
+            "Music\\4.mp3" })
+        {
+            Volume = 0.1f
+        };
 
+        private readonly FrmDiag _diagForm = new FrmDiag();
+        private readonly List<GamePreset> _gamePresets = new()
+        {
+            new GamePreset("简单", 8, 5, 10, Keys.F2),
+            new GamePreset("较难", 10, 6, 12, Keys.F3),
+            new GamePreset("困难", 12, 8, 15, Keys.F4),
+            new GamePreset("挑战", 15, 8, 20, Keys.F5),
+        };
         private readonly Dictionary<Point, Panel> _panelMap = new();
         private Map _map;
         private Panel _selectedPanel = null;
+        private GamePreset _selectedPreset;
         private int _selectedTileType = -1;
         private int _selectedX = -1;
         private int _selectedY = -1;
@@ -35,9 +55,50 @@ namespace LinkGame
         public FrmMain()
         {
             InitializeComponent();
+            this.DoubleBuffered = true;
+            this.SetStyle(ControlStyles.AllPaintingInWmPaint, true);
+            this.SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
+            this.UpdateStyles();
         }
 
         #endregion Public Constructors
+
+        #region Protected Methods
+
+        protected override void OnClosed(EventArgs e)
+        {
+            pnlMain.Controls.Clear();
+            foreach (ToolStripMenuItem item in mnuNewGame.DropDownItems)
+            {
+                item.Click -= Tmnu_Click;
+            }
+
+            _bgm.Stop();
+            _bgm.Dispose();
+
+            base.OnClosed(e);
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            mnuNewGame.DropDownItems.Clear();
+            foreach (var preset in _gamePresets)
+            {
+                var tmnu = new ToolStripMenuItem(preset.Name)
+                {
+                    ShortcutKeys = preset.Shortcut,
+                    Tag = preset,
+                };
+                tmnu.Click += Tmnu_Click;
+                mnuNewGame.DropDownItems.Add(tmnu);
+            }
+
+            mnuStopGame.Enabled = false;
+            mnuShowDiagWindow.Enabled = false;
+        }
+
+        #endregion Protected Methods
 
         #region Private Methods
 
@@ -66,15 +127,20 @@ namespace LinkGame
             using var g = pnlMain.CreateGraphics();
             foreach (var point in path)
             {
-                var rect = new Rectangle(point.X * 64, point.Y * 64, 64, 64);
-                g.FillRectangle(Brushes.Orange, rect);
+                var rect = new Rectangle(point.X * TileSize, point.Y * TileSize, TileSize, TileSize);
+                g.FillRectangle(Brushes.LightBlue, rect);
             }
             Thread.Sleep(50);
             foreach (var point in path)
             {
-                var rect = new Rectangle(point.X * 64, point.Y * 64, 64, 64);
+                var rect = new Rectangle(point.X * TileSize, point.Y * TileSize, TileSize, TileSize);
                 g.FillRectangle(SystemBrushes.Control, rect);
             }
+        }
+
+        private void FrmMain_DpiChanged(object sender, DpiChangedEventArgs e)
+        {
+
         }
 
         private void FrmMain_Resize(object sender, EventArgs e)
@@ -89,6 +155,7 @@ namespace LinkGame
             _selectedTileType = -1;
             _selectedX = -1;
             _selectedY = -1;
+
             LoadIconSet(iconSet);
 
             if (_map != null)
@@ -108,12 +175,18 @@ namespace LinkGame
 
             InitializeTiles();
             RenderMap();
+
+            _diagForm.Map = _map;
+            _diagForm.ShowDiagnosticInformation();
+
+            _bgm.Play();
         }
 
         private void InitializeTiles()
         {
-            pnlMain.Width = _map.Width * 64;
-            pnlMain.Height = _map.Height * 64;
+            pnlMain.Visible = true;
+            pnlMain.Width = _map.Width * TileSize;
+            pnlMain.Height = _map.Height * TileSize;
 
             pnlMain.Left = (Width - pnlMain.Width) / 2;
             pnlMain.Top = (Height - pnlMain.Height) / 2;
@@ -122,12 +195,12 @@ namespace LinkGame
             for (var x = 0; x < _map.Width; x++)
                 for (var y = 0; y < _map.Height; y++)
                 {
-                    var pnl = new Panel
+                    var pnl = new DoubleBufferedPanel
                     {
-                        Top = y * 64,
-                        Left = x * 64,
-                        Width = 64,
-                        Height = 64,
+                        Top = y * TileSize,
+                        Left = x * TileSize,
+                        Width = TileSize,
+                        Height = TileSize,
                     };
                     pnl.Click += pnl_Clicked;
                     _panelMap.Add(new Point(x, y), pnl);
@@ -148,12 +221,23 @@ namespace LinkGame
         }
         private void Map_TileChanged(object sender, TileChangedEventArgs e)
         {
-            // RenderMap();
             ConfigureTilePanel(e.X, e.Y, e.NewTileType);
         }
-        private void mnuEasyLevel_Click(object sender, EventArgs e)
+
+        private void mnuShowDiagWindow_Click(object sender, EventArgs e)
         {
-            InitializeGame(3, 2, 20, IconSet);
+            _diagForm.Show();
+        }
+
+        private void mnuStopGame_Click(object sender, EventArgs e)
+        {
+            pnlMain.Controls.Clear();
+            pnlMain.Visible = false;
+            _bgm.Stop();
+            mnuNewGame.Enabled = true;
+            mnuStopGame.Enabled = false;
+            mnuShowDiagWindow.Enabled = false;
+            _diagForm.Close();
         }
 
         private void pnl_Clicked(object sender, EventArgs e)
@@ -175,7 +259,7 @@ namespace LinkGame
                         DrawResolutionPath(resolution);
                         if (_map.Resolved)
                         {
-                            InitializeGame(3, 2, 20, IconSet);
+                            InitializeGame(_selectedPreset.Width, _selectedPreset.Height, _selectedPreset.TileTypes, IconSet);
                             return;
                         }
 
@@ -186,15 +270,17 @@ namespace LinkGame
                             RenderMap();
                             hasResolution = _map.HasResolution();
                         }
+
+                        _diagForm.ShowDiagnosticInformation();
                     }
                 }
 
-                _selectedPanel.BackColor = SystemColors.Control;
+                _selectedPanel.BackColor = Color.Transparent;
                 _selectedPanel = null;
                 _selectedX = -1;
                 _selectedY = -1;
                 _selectedTileType = -1;
-                pnl.BackColor = SystemColors.Control;
+                pnl.BackColor = Color.Transparent;
             }
             else if (_selectedTileType == -1)
             {
@@ -206,12 +292,12 @@ namespace LinkGame
             }
             else
             {
-                _selectedPanel.BackColor = SystemColors.Control;
+                _selectedPanel.BackColor = Color.Transparent;
                 _selectedPanel = null;
                 _selectedX = -1;
                 _selectedY = -1;
                 _selectedTileType = -1;
-                pnl.BackColor = SystemColors.Control;
+                pnl.BackColor = Color.Transparent;
             }
         }
 
@@ -232,13 +318,19 @@ namespace LinkGame
                     ConfigureTilePanel(x, y, _map.GetTileValue(x, y));
                 }
         }
-
-        protected override void OnClosed(EventArgs e)
+        private void Tmnu_Click(object sender, EventArgs e)
         {
-            pnlMain.Controls.Clear();
-            base.OnClosed(e);
+            if (sender is ToolStripMenuItem tmnu)
+            {
+                _selectedPreset = (GamePreset)tmnu.Tag;
+                InitializeGame(_selectedPreset.Width, _selectedPreset.Height, _selectedPreset.TileTypes, IconSet);
+                mnuStopGame.Enabled = true;
+                mnuNewGame.Enabled = false;
+                mnuShowDiagWindow.Enabled = true;
+            }
         }
 
         #endregion Private Methods
+
     }
 }
