@@ -16,7 +16,6 @@ namespace LinkGame
 
         #region Private Fields
 
-        private bool _isShowing = false;
         private Map _map;
 
         #endregion Private Fields

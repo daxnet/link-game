@@ -8,6 +8,7 @@ using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Media;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,6 +42,7 @@ namespace LinkGame
             new GamePreset("挑战", 15, 8, 20, Keys.F5),
         };
         private readonly Dictionary<Point, Panel> _panelMap = new();
+        private readonly SoundPlayer _soundPlayer = new(@"Music\click.wav");
         private Map _map;
         private Panel _selectedPanel = null;
         private GamePreset _selectedPreset;
@@ -75,6 +77,7 @@ namespace LinkGame
 
             _bgm.Stop();
             _bgm.Dispose();
+            _soundPlayer.Dispose();
 
             base.OnClosed(e);
         }
@@ -254,6 +257,7 @@ namespace LinkGame
                 {
                     if (_map.TryResolve(new Point(clickedX, clickedY), new Point(_selectedX, _selectedY), out var resolution))
                     {
+                        _soundPlayer.Play();
                         _map.SetTileValue(clickedX, clickedY);
                         _map.SetTileValue(_selectedX, _selectedY);
                         DrawResolutionPath(resolution);
