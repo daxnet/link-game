@@ -240,7 +240,7 @@ namespace LinkGame
             mnuNewGame.Enabled = true;
             mnuStopGame.Enabled = false;
             mnuShowDiagWindow.Enabled = false;
-            _diagForm.Close();
+            _diagForm.Hide();
         }
 
         private void pnl_Clicked(object sender, EventArgs e)
